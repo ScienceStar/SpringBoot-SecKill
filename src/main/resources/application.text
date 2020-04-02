@@ -1,0 +1,80 @@
+  docker inspect 0c006fcb59f0 7f3313996d4e 59e1cb220efc c1eb2f6fba2d a76c2298ed54 b302676ce7b0 | grep IPaddress
+
+    #指定基础镜像
+    FROM centos:7
+
+    #镜像作者
+    MAINTAINER lupf "397729842@qq.com"
+
+    #定义路径的环境变量
+    ENV REDIS_HOME /usr/local
+
+    #将Dockerfile同级目录下的redis-4.0.1.tar.gz复制到镜像的根目录
+    ADD redis-4.0.1.tar.gz /
+
+    #创建安装目录，根据环境变量信息，实际的创建目录为:/usr/local/redis
+    RUN mkdir -p $REDIS_HOME/redis
+
+    #将Dockerfile同级目录下redis-4.0.1中的redis配置文件拷贝到容器的/usr/local/redis目录中
+    ADD redis-4.0.1/redis.conf $REDIS_HOME/redis/
+
+    #更新镜像的yum
+    RUN yum -y update
+
+    #安装gcc相关编译工具
+    RUN yum install -y gcc make
+
+    #指定工作目录
+    WORKDIR /redis-4.0.1
+
+    #执行编译
+    RUN make
+
+    #移动编译后的redis-server到容器相关的目录
+    RUN mv /redis-4.0.1/src/redis-server  $REDIS_HOME/redis/
+
+    #移动到上一级
+    WORKDIR /
+
+    #删除解压文件
+    RUN rm -rf /redis-4.0.1
+
+    #删除对于的工具
+    RUN yum remove -y gcc make
+
+    #添加数据卷
+    #/usr/local/redis/logs/redis-server.log
+    #此目录需要和redis.conf中logfile一致
+    VOLUME ["/var/log/redis"]
+
+    #暴露6379的端口
+    EXPOSE 6379
+
+#!/bin/bash
+# node1 47.107.97.120   172.17.0.2
+n=0
+for ((i=n;i<=5461;i++))
+do
+   /usr/local/bin/redis-cli -h 47.107.97.120 -p 6379 -a 123456  CLUSTER ADDSLOTS $i
+done
+ 
+ 
+# node2 47.107.97.120    172.17.0.3
+n=5462
+for ((i=n;i<=10922;i++))
+do
+   /usr/local/bin/redis-cli -h 47.107.97.120 -p 6380 -a 123456 CLUSTER ADDSLOTS $i
+done
+ 
+ 
+# node3 47.107.97.120    172.17.0.4
+n=10923
+for ((i=n;i<=16383;i++))
+do
+   /usr/local/bin/redis-cli -h 47.107.97.120 -p 6381 -a 123456 CLUSTER ADDSLOTS $i
+done
+
+#!/bin/bash
+/usr/local/bin/redis-cli -h 47.107.97.120 -p 6382 -a 123456 CLUSTER REPLICATE 5b6ce331f48876027b7750a63e6e2b28ef9cd1f6
+/usr/local/bin/redis-cli -h 47.107.97.120 -p 6383 -a 123456 CLUSTER REPLICATE 5b93bd27425ca3c3e85b646ff83fabeac780fc64
+/usr/local/bin/redis-cli -h 47.107.97.120 -p 6384 -a 123456 CLUSTER REPLICATE c506c60b20b15ab4d7ead6d76983677eda16e772
