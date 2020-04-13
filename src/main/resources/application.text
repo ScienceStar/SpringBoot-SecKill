@@ -78,3 +78,44 @@ done
 /usr/local/bin/redis-cli -h 47.107.97.120 -p 6382 -a 123456 CLUSTER REPLICATE 5b6ce331f48876027b7750a63e6e2b28ef9cd1f6
 /usr/local/bin/redis-cli -h 47.107.97.120 -p 6383 -a 123456 CLUSTER REPLICATE 5b93bd27425ca3c3e85b646ff83fabeac780fc64
 /usr/local/bin/redis-cli -h 47.107.97.120 -p 6384 -a 123456 CLUSTER REPLICATE c506c60b20b15ab4d7ead6d76983677eda16e772
+
+#!/bin/sh
+#kill tomcat pid
+#这句尤为重要
+export BUILD_ID=apache-tomcat-8.5.51_build_id
+
+# 1.关闭tomcat
+pidlist=`ps -ef|grep apache-tomcat-8.5.51|grep -v "grep"|awk '{print $2}'`
+function stop(){
+if [ "$pidlist" == "" ]
+  then
+    echo "----tomcat 已经关闭----"
+
+ else
+    echo "tomcat进程号 :$pidlist"
+    kill -9 $pidlist
+    echo "KILL $pidlist:"
+fi
+}
+
+stop
+pidlist2=`ps -ef|grep apache-tomcat-8.5.51|grep -v "grep"|awk '{print $2}'`
+if [ "$pidlist2" == "" ]
+    then
+       echo "----关闭tomcat成功----"
+else
+    echo "----关闭tomcat失败----"
+fi
+
+
+
+# 2.移除原来tomcat中webapps中的项目文件夹
+rm -rf /opt/apache-tomcat-8.5.51/webapps/ROOT*
+# 3.复制jenkins生成的war包到tomcat中webapps中
+cp -r /var/jenkins_home/workspace/SpringBoot-SecKill/target/springboot-seckill-0.0.1-SNAPSHOT.war  /opt/apache-tomcat-8.5.51/webapps
+sleep 3s
+# 4.修改war包的名称
+mv /opt/apache-tomcat-8.5.51/webapps/springboot-seckill-0.0.1-SNAPSHOT.war  /opt/apache-tomcat-8.5.51/webapps/ROOT.war
+# 5.启动tomcat
+cd /opt/apache-tomcat-8.5.51/bin
+./startup.sh
